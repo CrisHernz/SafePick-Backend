@@ -1,47 +1,35 @@
-# Stage 1: Build
+# ---- Stage 1: Build ----
 FROM node:20-alpine AS builder
+WORKDIR /app
 
-# Instalar dependencias necesarias para Prisma
+# Instalar openssl para Prisma
 RUN apk add --no-cache openssl
 
-WORKDIR /app
-
-# Copiar archivos de dependencias
 COPY package*.json ./
-COPY prisma ./prisma/
-
-# Instalar todas las dependencias
 RUN npm ci
 
-# Copiar código fuente
 COPY . .
-
-# Generar Prisma Client
-RUN npx prisma generate
-
-# Compilar TypeScript
 RUN npm run build
 
-# Stage 2: Production
-FROM node:20-alpine
-
-RUN apk add --no-cache openssl dumb-init
-
+# ---- Stage 2: Runtime ----
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copiar package files
-COPY package*.json ./
-COPY prisma ./prisma/
+# Instalar openssl para Prisma
+RUN apk add --no-cache openssl dumb-init
+
+ENV NODE_ENV=production
+ENV PORT=3001
 
 # Instalar solo dependencias de producción
+COPY package*.json ./
 RUN npm ci --only=production
 
-# Copiar build desde stage anterior
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Copiar el build y la carpeta prisma
+COPY --from=builder /app/dist   ./dist
+COPY --from=builder /app/prisma ./prisma
 
-# Exponer puerto (Railway asigna automáticamente)
 EXPOSE 3001
 
-# Ejecutar migraciones y luego iniciar la app
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# Generar cliente, ejecutar migraciones e iniciar app
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/main"]
