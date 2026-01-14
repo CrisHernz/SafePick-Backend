@@ -9,6 +9,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+# Generar cliente Prisma (solo genera tipos, no se conecta a BD)
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+RUN npx prisma generate
 RUN npm run build
 
 # ---- Stage 2: Runtime ----
