@@ -35,23 +35,23 @@ async function main() {
   // 2. Padres
   const parent1 = await prisma.user.create({
     data: {
-      email: "maria.garcia@email.com",
+      email: "giuliana.hernandez@gmail.com",
       password: hashedPassword,
-      name: "María García López",
+      name: "Giuliana Hernández",
       role: UserRole.PARENT,
-      cedula: "9876543210",
-      phone: "+34987654321",
+      cedula: "1721599361",
+      phone: "+593988344069",
     },
   });
 
   const parent2 = await prisma.user.create({
     data: {
-      email: "juan.perez@email.com",
+      email: "cristian.hernandez@gmail.com",
       password: hashedPassword,
-      name: "Juan Pérez Martínez",
+      name: "Cristian Hernández",
       role: UserRole.PARENT,
-      cedula: "5551234567",
-      phone: "+34555123456",
+      cedula: "1721138988",
+      phone: "+593991935080",
     },
   });
 
@@ -103,7 +103,7 @@ async function main() {
   // Hijos de María García
   const child1 = await prisma.child.create({
     data: {
-      name: "Sofía García",
+      name: "Micaela Hernández",
       grade: "3° Primaria",
       school: "Colegio San José",
       parentId: parent1.id,
@@ -112,17 +112,17 @@ async function main() {
 
   const child2 = await prisma.child.create({
     data: {
-      name: "Lucas García",
+      name: " Kenny Guañuna",
       grade: "5° Primaria",
       school: "Colegio San José",
       parentId: parent1.id,
     },
   });
-
-  // Hijos de Juan Pérez
+  
+  // Hijos de Cristian Hernández
   const child3 = await prisma.child.create({
     data: {
-      name: "Emma Pérez",
+      name: "Amelie Hernández",
       grade: "2° Primaria",
       school: "Colegio Santa María",
       parentId: parent2.id,
