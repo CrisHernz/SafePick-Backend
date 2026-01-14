@@ -34,5 +34,5 @@ COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3001
 
-# Generar cliente, ejecutar migraciones e iniciar app
-CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/src/main.js"]
+# Generar cliente, ejecutar migraciones, seed e iniciar app
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npx tsx prisma/seed-simple.ts && node dist/src/main.js"]
