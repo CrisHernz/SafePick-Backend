@@ -60,7 +60,7 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 3001;
-  const host = process.env.HOST || "localhost";
+  const host = process.env.HOST || "0.0.0.0";
   const env = process.env.NODE_ENV || "development";
 
   await app.listen(port, host);
