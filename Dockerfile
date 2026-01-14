@@ -35,4 +35,4 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 3001
 
 # Generar cliente, ejecutar migraciones e iniciar app
-CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node dist/src/main.js"]
