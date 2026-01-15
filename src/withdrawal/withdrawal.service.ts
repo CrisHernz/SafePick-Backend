@@ -75,6 +75,30 @@ export class WithdrawalService {
       throw new BadRequestException("Child does not belong to this user");
     }
 
+    // Validar cédula del encargado
+    // Puede ser: 1) Cédula de otro padre del sistema, o 2) Cédula nueva
+    const existingPicker = await this.prisma.picker.findUnique({
+      where: { cedula: createWithdrawalOrderDto.pickerCedula },
+    });
+
+    if (existingPicker) {
+      throw new BadRequestException(
+        "Esta cédula ya tiene una orden de retiro activa. Completa o cancela la orden anterior primero."
+      );
+    }
+
+    // Buscar si la cédula pertenece a un padre del sistema
+    const parentUser = await this.prisma.user.findUnique({
+      where: { cedula: createWithdrawalOrderDto.pickerCedula },
+      select: { id: true, name: true, role: true },
+    });
+
+    // Si es un padre del sistema, usar su nombre
+    const pickerName =
+      parentUser?.role === "PARENT"
+        ? parentUser.name
+        : createWithdrawalOrderDto.pickerName;
+
     // Generar credenciales temporales para el picker
     const temporaryCode = this.generateTemporaryCode();
     const temporaryPassword = await bcrypt.hash(temporaryCode, 10);
@@ -88,7 +112,7 @@ export class WithdrawalService {
         parentId: userId,
         picker: {
           create: {
-            name: createWithdrawalOrderDto.pickerName,
+            name: pickerName,
             cedula: createWithdrawalOrderDto.pickerCedula,
             phone: createWithdrawalOrderDto.pickerPhone,
             relationship: createWithdrawalOrderDto.relationship,
@@ -286,18 +310,42 @@ export class WithdrawalService {
 
     const completionTime = new Date();
 
-    const updatedOrder = (await this.prisma.withdrawalOrder.update({
-      where: { id: orderId },
-      data: {
-        status: WithdrawalStatus.COMPLETED,
-        withdrawalDate: completionTime,
-      },
-      include: {
-        child: true,
-        picker: true,
-        parent: true,
-      },
-    })) as any;
+    // Actualizar orden y crear log en una transacción
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Actualizar orden
+      const updatedOrder = (await tx.withdrawalOrder.update({
+        where: { id: orderId },
+        data: {
+          status: WithdrawalStatus.COMPLETED,
+          withdrawalDate: completionTime,
+        },
+        include: {
+          child: true,
+          picker: true,
+          parent: true,
+        },
+      })) as any;
+
+      // Crear log de retiro
+      await tx.withdrawalLog.create({
+        data: {
+          withdrawalOrderId: orderId,
+          pickerCedula: order.picker.cedula,
+          pickerName: order.picker.name,
+          childName: order.child.name,
+          parentName: order.parent.name,
+          completedAt: completionTime,
+          completedBy: role, // GUARDIAN o ADMIN
+        },
+      });
+
+      // Eliminar registro temporal del picker
+      await tx.picker.delete({
+        where: { id: order.picker.id },
+      });
+
+      return updatedOrder;
+    });
 
     // Enviar notificación al padre por Telegram
     if (order.parent && order.picker) {
@@ -313,7 +361,7 @@ export class WithdrawalService {
     return {
       success: true,
       message: "Withdrawal completed successfully",
-      order: updatedOrder,
+      order: result,
     };
   }
 
@@ -321,6 +369,7 @@ export class WithdrawalService {
   async cancelWithdrawal(orderId: string, userId: string) {
     const order = await this.prisma.withdrawalOrder.findUnique({
       where: { id: orderId },
+      include: { picker: true },
     });
 
     if (!order) {
@@ -331,19 +380,32 @@ export class WithdrawalService {
       throw new BadRequestException("Unauthorized");
     }
 
-    const updatedOrder = await this.prisma.withdrawalOrder.update({
-      where: { id: orderId },
-      data: { status: WithdrawalStatus.CANCELLED },
-      include: {
-        child: true,
-        picker: true,
-      },
+    // Cancelar orden y eliminar picker en transacción
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Actualizar orden a CANCELLED
+      const updatedOrder = await tx.withdrawalOrder.update({
+        where: { id: orderId },
+        data: { status: WithdrawalStatus.CANCELLED },
+        include: {
+          child: true,
+          picker: true,
+        },
+      });
+
+      // Eliminar registro temporal del picker si existe
+      if (order.picker) {
+        await tx.picker.delete({
+          where: { id: order.picker.id },
+        });
+      }
+
+      return updatedOrder;
     });
 
     return {
       success: true,
-      message: "Withdrawal cancelled",
-      order: updatedOrder,
+      message: "Withdrawal cancelled and temporary credentials removed",
+      order: result,
     };
   }
 
