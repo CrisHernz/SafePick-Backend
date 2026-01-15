@@ -80,7 +80,7 @@ export class NotificationService {
       const timeStr = completionTime.toLocaleString("es-ES", {
         dateStyle: "long",
         timeStyle: "short",
-        timeZone: "America/Mexico_City",
+        timeZone: "America/Guayaquil",
       });
 
       const message = `

@@ -68,8 +68,26 @@ model WithdrawalOrder {
   picker         Picker?
   child          Child            @relation(fields: [childId], references: [id], onDelete: Cascade)
   parent         User             @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  withdrawalLog  WithdrawalLog?
 
   @@map("withdrawal_orders")
+}
+
+model WithdrawalLog {
+  id                String          @id @default(cuid())
+  withdrawalOrderId String          @unique
+  pickerCedula      String
+  pickerName        String
+  childName         String
+  parentName        String
+  completedAt       DateTime        @default(now())
+  completedBy       String          // ID del guardia/admin que completó
+  createdAt         DateTime        @default(now())
+  withdrawalOrder   WithdrawalOrder @relation(fields: [withdrawalOrderId], references: [id], onDelete: Cascade)
+
+  @@index([pickerCedula])
+  @@index([completedAt])
+  @@map("withdrawal_logs")
 }
 
 enum UserRole {

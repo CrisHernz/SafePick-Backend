@@ -308,12 +308,36 @@ export class WithdrawalService {
       throw new BadRequestException("Withdrawal order must be validated first");
     }
 
+    if (!order.picker) {
+      throw new BadRequestException("No picker associated with this order");
+    }
+
     const completionTime = new Date();
 
-    // Actualizar orden y crear log en una transacción
+    // Guardar datos del picker ANTES de eliminarlo
+    const pickerData = {
+      cedula: order.picker.cedula,
+      name: order.picker.name,
+      pickerId: order.picker.id,
+    };
+
+    // Actualizar orden, crear log y eliminar picker en una transacción
     const result = await this.prisma.$transaction(async (tx) => {
-      // Actualizar orden
-      const updatedOrder = (await tx.withdrawalOrder.update({
+      // 1. Primero crear el log (antes de eliminar el picker)
+      await tx.withdrawalLog.create({
+        data: {
+          withdrawalOrderId: orderId,
+          pickerCedula: pickerData.cedula,
+          pickerName: pickerData.name,
+          childName: order.child.name,
+          parentName: order.parent.name,
+          completedAt: completionTime,
+          completedBy: role,
+        },
+      });
+
+      // 2. Actualizar orden
+      const updatedOrder = await tx.withdrawalOrder.update({
         where: { id: orderId },
         data: {
           status: WithdrawalStatus.COMPLETED,
@@ -321,38 +345,25 @@ export class WithdrawalService {
         },
         include: {
           child: true,
-          picker: true,
           parent: true,
-        },
-      })) as any;
-
-      // Crear log de retiro
-      await tx.withdrawalLog.create({
-        data: {
-          withdrawalOrderId: orderId,
-          pickerCedula: order.picker.cedula,
-          pickerName: order.picker.name,
-          childName: order.child.name,
-          parentName: order.parent.name,
-          completedAt: completionTime,
-          completedBy: role, // GUARDIAN o ADMIN
+          withdrawalLog: true,
         },
       });
 
-      // Eliminar registro temporal del picker
+      // 3. Eliminar registro temporal del picker
       await tx.picker.delete({
-        where: { id: order.picker.id },
+        where: { id: pickerData.pickerId },
       });
 
       return updatedOrder;
     });
 
     // Enviar notificación al padre por Telegram
-    if (order.parent && order.picker) {
+    if (order.parent?.telegramChatId) {
       await this.notificationService.notifyWithdrawalCompleted(
         order.parent.telegramChatId,
         order.child.name,
-        order.picker.name,
+        pickerData.name,
         order.picker.relationship,
         completionTime
       );
@@ -566,44 +577,72 @@ export class WithdrawalService {
       throw new NotFoundException("Orden no encontrada");
     }
 
-    // 2. Verificar que la orden esté validada (picker ya hizo login)
     if (order.status !== WithdrawalStatus.VALIDATED) {
       throw new BadRequestException(
         `La orden debe estar VALIDADA primero. Estado actual: ${order.status}`
       );
     }
 
-    // 3. Completar el retiro
+    if (!order.picker) {
+      throw new BadRequestException("No hay picker asociado a esta orden");
+    }
+
     const completionTime = new Date();
 
-    const updatedOrder = (await this.prisma.withdrawalOrder.update({
-      where: { id: order.id },
-      data: {
-        status: WithdrawalStatus.COMPLETED,
-        withdrawalDate: completionTime,
-      },
-      include: {
-        child: true,
-        picker: true,
-        parent: true,
-      },
-    })) as any;
+    // Guardar datos del picker ANTES de eliminarlo
+    const pickerData = {
+      cedula: order.picker.cedula,
+      name: order.picker.name,
+      relationship: order.picker.relationship,
+      pickerId: order.picker.id,
+    };
 
-    // 4. Desactivar el picker (ya no puede usarse)
-    await this.prisma.picker.update({
-      where: { id: order.picker.id },
-      data: { isActive: false },
+    // Ejecutar todo en una transacción
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // 1. Crear log de retiro
+      await tx.withdrawalLog.create({
+        data: {
+          withdrawalOrderId: order.id,
+          pickerCedula: pickerData.cedula,
+          pickerName: pickerData.name,
+          childName: order.child.name,
+          parentName: order.parent.name,
+          completedAt: completionTime,
+          completedBy: "GUARDIAN",
+        },
+      });
+
+      // 2. Actualizar orden
+      const updated = await tx.withdrawalOrder.update({
+        where: { id: order.id },
+        data: {
+          status: WithdrawalStatus.COMPLETED,
+          withdrawalDate: completionTime,
+        },
+        include: {
+          child: true,
+          parent: true,
+        },
+      });
+
+      // 3. Eliminar el picker temporal
+      await tx.picker.delete({
+        where: { id: pickerData.pickerId },
+      });
+
+      return updated;
     });
 
-    // 5. Enviar notificación al padre por Telegram
-    const notificationSent =
-      await this.notificationService.notifyWithdrawalCompleted(
-        order.parent.telegramChatId,
-        order.child.name,
-        order.picker.name,
-        order.picker.relationship,
-        completionTime
-      );
+    // Enviar notificación al padre por Telegram
+    const notificationSent = order.parent?.telegramChatId
+      ? await this.notificationService.notifyWithdrawalCompleted(
+          order.parent.telegramChatId,
+          order.child.name,
+          pickerData.name,
+          pickerData.relationship,
+          completionTime
+        )
+      : false;
 
     return {
       success: true,
@@ -618,9 +657,9 @@ export class WithdrawalService {
           grade: updatedOrder.child.grade,
         },
         picker: {
-          name: updatedOrder.picker.name,
-          cedula: updatedOrder.picker.cedula,
-          relationship: updatedOrder.picker.relationship,
+          name: pickerData.name,
+          cedula: pickerData.cedula,
+          relationship: pickerData.relationship,
         },
         parent: {
           name: updatedOrder.parent.name,
