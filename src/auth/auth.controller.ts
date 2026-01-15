@@ -1,13 +1,17 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   ValidationPipe,
   HttpCode,
+  UseGuards,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { CreateUserDto, LoginDto } from "../common/dtos";
+import { JwtGuard } from "../common/guards/jwt.guard";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
 
 @Controller("auth")
 export class AuthController {
@@ -34,5 +38,23 @@ export class AuthController {
     @Body("temporaryCode") temporaryCode: string
   ) {
     return this.authService.loginPicker(cedula, temporaryCode);
+  }
+
+  @Get("me")
+  @UseGuards(JwtGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getCurrentUser(@CurrentUser() user: any) {
+    return this.authService.getUserProfile(user.id);
+  }
+
+  @Post("telegram/link")
+  @UseGuards(JwtGuard)
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async linkTelegramAccount(
+    @CurrentUser() user: any,
+    @Body("chatId") chatId: string
+  ) {
+    return this.authService.linkTelegramAccount(user.id, chatId);
   }
 }

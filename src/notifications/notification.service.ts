@@ -24,6 +24,7 @@ export class NotificationService {
         this.bot = new TelegramBot(token, { polling: false });
         this.enabled = true;
         this.logger.log("✅ Telegram Bot inicializado correctamente");
+        this.initializeBot();
       } catch (error) {
         this.logger.error("❌ Error al inicializar Telegram Bot:", error);
         this.enabled = false;
@@ -34,6 +35,25 @@ export class NotificationService {
       );
       this.enabled = false;
     }
+  }
+
+  private async initializeBot() {
+    if (!this.bot) return;
+
+    try {
+      const botInfo = await this.bot.getMe();
+      this.logger.log(`🤖 Bot conectado: @${botInfo.username}`);
+      process.env.TELEGRAM_BOT_USERNAME = botInfo.username;
+    } catch (error) {
+      this.logger.error("Error al obtener info del bot:", error);
+    }
+  }
+
+  /**
+   * Obtener el username del bot
+   */
+  getBotUsername(): string {
+    return process.env.TELEGRAM_BOT_USERNAME || "SafePick_Notifications_bot";
   }
 
   /**

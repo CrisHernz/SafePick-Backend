@@ -164,4 +164,53 @@ export class AuthService {
       expiresAt: picker.codeExpiresAt,
     };
   }
+
+  // Vincular cuenta de Telegram con el usuario
+  async linkTelegramAccount(userId: string, chatId: string) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { telegramChatId: chatId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        telegramChatId: true,
+      },
+    });
+
+    return {
+      message: "Cuenta de Telegram vinculada exitosamente",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        telegramLinked: !!user.telegramChatId,
+      },
+    };
+  }
+
+  // Obtener perfil del usuario
+  async getUserProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        cedula: true,
+        phone: true,
+        telegramChatId: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("User not found");
+    }
+
+    return {
+      ...user,
+      telegramLinked: !!user.telegramChatId,
+    };
+  }
 }

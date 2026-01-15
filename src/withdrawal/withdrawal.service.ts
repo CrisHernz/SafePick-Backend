@@ -45,6 +45,23 @@ export class WithdrawalService {
     userId: string,
     createWithdrawalOrderDto: CreateWithdrawalOrderDto
   ) {
+    // Verificar que el usuario tiene Telegram configurado
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramChatId: true },
+    });
+
+    if (!user?.telegramChatId) {
+      throw new BadRequestException(
+        JSON.stringify({
+          code: "TELEGRAM_NOT_CONFIGURED",
+          message: "Debes vincular tu cuenta de Telegram primero",
+          botUsername:
+            process.env.TELEGRAM_BOT_USERNAME || "SafePick_Notifications_bot",
+        })
+      );
+    }
+
     // Verificar que el niño existe y pertenece al usuario
     const child = await this.prisma.child.findUnique({
       where: { id: createWithdrawalOrderDto.childId },
