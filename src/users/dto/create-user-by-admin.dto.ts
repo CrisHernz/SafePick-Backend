@@ -12,9 +12,9 @@ import { UserRole } from "@prisma/client";
 import {
   IsCedulaEcuatoriana,
   IsTelefonoEcuatoriano,
-} from "../validators/ecuador.validator";
+} from "../../common/validators/ecuador.validator";
 
-export class CreateUserDto {
+export class CreateUserByAdminDto {
   @IsEmail({}, { message: "Formato de email inválido" })
   @IsNotEmpty({ message: "El email es requerido" })
   email: string;

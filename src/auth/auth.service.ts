@@ -31,12 +31,21 @@ export class AuthService {
         ...createUserDto,
         password: hashedPassword,
       },
+      include: {
+        institution: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     const token = this.jwtService.sign({
       sub: user.id,
       email: user.email,
       role: user.role,
+      institutionId: user.institutionId,
     });
 
     return {
@@ -44,6 +53,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+      institutionId: user.institutionId,
+      institution: user.institution,
       token,
       message: "User created successfully. Welcome email has been sent.",
     };
@@ -52,10 +63,23 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: loginDto.email },
+      include: {
+        institution: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!user) {
       throw new UnauthorizedException("Invalid credentials");
+    }
+
+    // Verificar si el usuario está activo
+    if (user.isActive === false) {
+      throw new UnauthorizedException("User account is deactivated");
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -71,6 +95,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      institutionId: user.institutionId,
     });
 
     return {
@@ -78,6 +103,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+      institutionId: user.institutionId,
+      institution: user.institution,
       token,
       accessToken: token, // Por compatibilidad
     };
@@ -86,6 +113,14 @@ export class AuthService {
   async validateUser(payload: any) {
     return await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      include: {
+        institution: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
   }
 

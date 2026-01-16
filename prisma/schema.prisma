@@ -7,6 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Institution {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  address   String?
+  phone     String?
+  email     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  children  Child[]
+
+  @@map("institutions")
+}
+
 model User {
   id               String            @id @default(cuid())
   email            String            @unique
@@ -16,8 +31,11 @@ model User {
   cedula           String?           @unique
   phone            String?
   telegramChatId   String?           // Chat ID de Telegram para notificaciones
+  isActive         Boolean           @default(true)
+  institutionId    String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  institution      Institution?      @relation(fields: [institutionId], references: [id])
   children         Child[]
   withdrawalOrders WithdrawalOrder[]
 
@@ -30,9 +48,11 @@ model Child {
   grade            String
   school           String
   parentId         String
+  institutionId    String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   parent           User              @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  institution      Institution?      @relation(fields: [institutionId], references: [id])
   withdrawalOrders WithdrawalOrder[]
 
   @@map("children")
@@ -95,6 +115,7 @@ enum UserRole {
   GUARDIAN
   ADMIN
   PICKER
+  GESTOR
 }
 
 enum WithdrawalStatus {
