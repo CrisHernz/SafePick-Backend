@@ -8,7 +8,7 @@ import { SecretsService } from "../../config/secrets.service";
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private authService: AuthService,
-    private secretsService: SecretsService
+    private secretsService: SecretsService,
   ) {
     const secret = secretsService.getJwtSecret();
     super({
@@ -40,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       role: user.role,
       name: user.name,
+      institutionId: user.institutionId,
     };
   }
 }

@@ -233,12 +233,12 @@ async function main() {
   // Padres del Colegio San José
   const parent1 = await prisma.user.create({
     data: {
-      email: "maria.garcia@gmail.com",
+      email: "cristian.hernandez@gmail.com",
       password: hashedPassword,
-      name: "María García López",
+      name: "Cristian Hernández Silva",
       role: UserRole.PARENT,
-      cedula: "1760845170", // Cédula válida Pichincha
-      phone: "+593991234567",
+      cedula: "1721138988", // Cédula válida Pichincha
+      phone: "+593991935080",
       institutionId: colegioSanJose.id,
       isActive: true,
     },
@@ -303,10 +303,10 @@ async function main() {
   // ========== NIÑOS ==========
   console.log("\n👶 Creando niños...");
 
-  // Hijos de María García (San José)
+  // Hijos de Cristian Hernández (San José)
   const child1 = await prisma.child.create({
     data: {
-      name: "Sofía García",
+      name: "Amelie Hernández",
       grade: "3° Primaria",
       school: "Unidad Educativa San José La Salle",
       parentId: parent1.id,
@@ -316,7 +316,7 @@ async function main() {
 
   const child2 = await prisma.child.create({
     data: {
-      name: "Lucas García",
+      name: "Lucas Hernández",
       grade: "5° Primaria",
       school: "Unidad Educativa San José La Salle",
       parentId: parent1.id,
@@ -403,7 +403,7 @@ async function main() {
   });
 
   console.log(
-    `✅ Orden 1 creada - Código temporal: ${tempCode1} (expira: ${expiresAt1.toLocaleString("es-EC")})`
+    `✅ Orden 1 creada - Código temporal: ${tempCode1} (expira: ${expiresAt1.toLocaleString("es-EC")})`,
   );
 
   // Orden 2: Validada - Lucas García (con credenciales temporales)
@@ -437,7 +437,7 @@ async function main() {
   });
 
   console.log(
-    `✅ Orden 2 creada - Código temporal: ${tempCode2} (expira: ${expiresAt2.toLocaleString("es-EC")})`
+    `✅ Orden 2 creada - Código temporal: ${tempCode2} (expira: ${expiresAt2.toLocaleString("es-EC")})`,
   );
 
   // Orden 3: Completada - Emma Pérez
@@ -493,7 +493,7 @@ async function main() {
   });
 
   console.log(
-    `✅ Orden 4 creada - Código temporal: ${tempCode4} (expira: ${expiresAt4.toLocaleString("es-EC")})`
+    `✅ Orden 4 creada - Código temporal: ${tempCode4} (expira: ${expiresAt4.toLocaleString("es-EC")})`,
   );
 
   // Orden 5: Cancelada - Valentina Rodríguez
@@ -523,11 +523,11 @@ async function main() {
   // ========== RESUMEN ==========
   console.log("\n🎉 Seed completado exitosamente!\n");
   console.log(
-    "═══════════════════════════════════════════════════════════════"
+    "═══════════════════════════════════════════════════════════════",
   );
   console.log("📊 RESUMEN DE DATOS CREADOS:");
   console.log(
-    "═══════════════════════════════════════════════════════════════"
+    "═══════════════════════════════════════════════════════════════",
   );
   console.log("   📚 4 Instituciones");
   console.log("   👑 1 Admin");
@@ -537,12 +537,12 @@ async function main() {
   console.log("   👶 6 Niños");
   console.log("   📝 5 Órdenes de retiro");
   console.log(
-    "═══════════════════════════════════════════════════════════════\n"
+    "═══════════════════════════════════════════════════════════════\n",
   );
 
   console.log("🔐 CREDENCIALES DE PRUEBA (contraseña: Password123!):");
   console.log(
-    "═══════════════════════════════════════════════════════════════"
+    "═══════════════════════════════════════════════════════════════",
   );
   console.log("\n👑 ADMIN:");
   console.log("   └─ admin@safepick.com");
@@ -550,43 +550,43 @@ async function main() {
   console.log("\n📋 GESTORES:");
   console.log("   ├─ gestor.sanjose@safepick.com     (U.E. San José La Salle)");
   console.log(
-    "   ├─ gestor.santamaria@safepick.com  (Colegio Santa María Eufrasia)"
+    "   ├─ gestor.santamaria@safepick.com  (Colegio Santa María Eufrasia)",
   );
   console.log(
-    "   ├─ gestor.libertad@safepick.com    (Escuela Fiscal Libertad)"
+    "   ├─ gestor.libertad@safepick.com    (Escuela Fiscal Libertad)",
   );
   console.log(
-    "   └─ gestor.inactivo@safepick.com    (Instituto Tecnológico Simón Bolívar - INACTIVO)"
+    "   └─ gestor.inactivo@safepick.com    (Instituto Tecnológico Simón Bolívar - INACTIVO)",
   );
 
   console.log("\n🛡️  GUARDIAS:");
   console.log(
-    "   ├─ guardia1@sanjose.edu.ec            (U.E. San José La Salle)"
+    "   ├─ guardia1@sanjose.edu.ec            (U.E. San José La Salle)",
   );
   console.log(
-    "   ├─ guardia2@sanjose.edu.ec            (U.E. San José La Salle)"
+    "   ├─ guardia2@sanjose.edu.ec            (U.E. San José La Salle)",
   );
   console.log(
-    "   ├─ guardia1@santamariaeufrasia.edu.ec (Colegio Santa María Eufrasia)"
+    "   ├─ guardia1@santamariaeufrasia.edu.ec (Colegio Santa María Eufrasia)",
   );
   console.log(
-    "   ├─ guardia1@escuelalibertad.edu.ec    (Escuela Fiscal Libertad)"
+    "   ├─ guardia1@escuelalibertad.edu.ec    (Escuela Fiscal Libertad)",
   );
   console.log("   └─ guardia.inactivo@sanjose.edu.ec    (INACTIVO)");
 
   console.log("\n👨‍👩‍👧‍👦 PADRES:");
-  console.log("   ├─ maria.garcia@gmail.com    (U.E. San José La Salle)");
+  console.log("   ├─ cristian.hernandez@gmail.com    (U.E. San José La Salle)");
   console.log("   ├─ juan.perez@hotmail.com    (U.E. San José La Salle)");
   console.log("   ├─ ana.rodriguez@outlook.com (Colegio Santa María Eufrasia)");
   console.log("   ├─ pedro.jimenez@yahoo.com   (Escuela Fiscal Libertad)");
   console.log("   └─ lucia.fernandez@gmail.com (Sin institución)");
 
   console.log(
-    "\n═══════════════════════════════════════════════════════════════"
+    "\n═══════════════════════════════════════════════════════════════",
   );
   console.log("📱 Códigos temporales de pickers mostrados arriba");
   console.log(
-    "═══════════════════════════════════════════════════════════════\n"
+    "═══════════════════════════════════════════════════════════════\n",
   );
 }
 

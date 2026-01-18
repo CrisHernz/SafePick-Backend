@@ -31,7 +31,7 @@ export class NotificationService {
       }
     } else {
       this.logger.warn(
-        "⚠️ TELEGRAM_BOT_TOKEN no configurado - notificaciones deshabilitadas"
+        "⚠️ TELEGRAM_BOT_TOKEN no configurado - notificaciones deshabilitadas",
       );
       this.enabled = false;
     }
@@ -53,7 +53,7 @@ export class NotificationService {
    * Obtener el username del bot
    */
   getBotUsername(): string {
-    return process.env.TELEGRAM_BOT_USERNAME || "SafePick_Notifications_bot";
+    return process.env.TELEGRAM_BOT_USERNAME || "safe_pick_uio_bot";
   }
 
   /**
@@ -64,7 +64,7 @@ export class NotificationService {
     childName: string,
     pickerName: string,
     pickerRelationship: string,
-    completionTime: Date
+    completionTime: Date,
   ): Promise<boolean> {
     if (!this.enabled || !this.bot) {
       this.logger.warn("Notificaciones Telegram deshabilitadas");
@@ -105,7 +105,7 @@ _SafePick - Colegio Seguro_
       });
 
       this.logger.log(
-        `✅ Notificación enviada a Telegram chat ID: ${telegramChatId}`
+        `✅ Notificación enviada a Telegram chat ID: ${telegramChatId}`,
       );
       return true;
     } catch (error) {
@@ -123,7 +123,7 @@ _SafePick - Colegio Seguro_
     pickerName: string,
     pickerCedula: string,
     temporaryCode: string,
-    expiresAt: Date
+    expiresAt: Date,
   ): Promise<boolean> {
     if (!this.enabled || !this.bot || !telegramChatId) {
       return false;
@@ -172,7 +172,7 @@ _SafePick - Colegio Seguro_
   async notifyOrderCancelled(
     telegramChatId: string | null,
     childName: string,
-    reason?: string
+    reason?: string,
   ): Promise<boolean> {
     if (!this.enabled || !this.bot || !telegramChatId) {
       return false;
@@ -198,7 +198,7 @@ _SafePick - Colegio Seguro_
     } catch (error) {
       this.logger.error(
         `❌ Error al enviar notificación de cancelación:`,
-        error
+        error,
       );
       return false;
     }
