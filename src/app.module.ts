@@ -10,6 +10,7 @@ import { ChildrenModule } from "./children/children.module";
 import { WithdrawalModule } from "./withdrawal/withdrawal.module";
 import { NotificationModule } from "./notifications/notification.module";
 import { InstitutionsModule } from "./institutions/institutions.module";
+import { UsersModule } from "./users/users.module";
 @Module({
   imports: [
     // ✅ Config module (provides SecretService)
@@ -39,6 +40,7 @@ import { InstitutionsModule } from "./institutions/institutions.module";
     WithdrawalModule,
     NotificationModule,
     InstitutionsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [
