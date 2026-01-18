@@ -7,12 +7,27 @@ import { SecretsService } from "./config/secrets.service";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // ✅ Security: Helmet for HTTP security headers (more permissive in development)
+  // ✅ Security: Helmet for HTTP security headers with strict CSP
   app.use(
     helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          fontSrc: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'self'"],
+          imgSrc: ["'self'", "data:"],
+          objectSrc: ["'none'"],
+          scriptSrc: ["'self'"],
+          scriptSrcAttr: ["'none'"],
+          styleSrc: ["'self'"],
+          upgradeInsecureRequests: [],
+        },
+      },
       crossOriginResourcePolicy: { policy: "cross-origin" },
       crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-    })
+    }),
   );
 
   // ✅ Global validation pipe
@@ -24,7 +39,7 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-    })
+    }),
   );
 
   // ✅ CORS configuration (restrictive)
@@ -44,7 +59,7 @@ async function bootstrap() {
   app.use((req, res, next) => {
     res.setHeader(
       "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
+      "max-age=31536000; includeSubDomains; preload",
     );
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
@@ -52,10 +67,10 @@ async function bootstrap() {
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader(
       "Permissions-Policy",
-      "geolocation=(), microphone=(), camera=()"
+      "geolocation=(), microphone=(), camera=()",
     );
     res.removeHeader("X-Powered-By");
-    res.setHeader("Server", "SafePick/1.0");
+    res.removeHeader("Server");
     next();
   });
 
