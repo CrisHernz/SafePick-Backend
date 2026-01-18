@@ -15,7 +15,7 @@ import { CryptoUtil } from "../common/utils/crypto.util";
 export class WithdrawalService {
   constructor(
     private prisma: PrismaService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
   ) {}
 
   // Generar código temporal de 6 dígitos
@@ -43,24 +43,10 @@ export class WithdrawalService {
   // Paso 1: Crear orden de retiro con datos del picker y credenciales temporales
   async createWithdrawalOrder(
     userId: string,
-    createWithdrawalOrderDto: CreateWithdrawalOrderDto
+    createWithdrawalOrderDto: CreateWithdrawalOrderDto,
   ) {
-    // Verificar que el usuario tiene Telegram configurado
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { telegramChatId: true },
-    });
-
-    if (!user?.telegramChatId) {
-      throw new BadRequestException(
-        JSON.stringify({
-          code: "TELEGRAM_NOT_CONFIGURED",
-          message: "Debes vincular tu cuenta de Telegram primero",
-          botUsername:
-            process.env.TELEGRAM_BOT_USERNAME || "SafePick_Notifications_bot",
-        })
-      );
-    }
+    // Telegram es opcional - solo se usará para notificaciones si está configurado
+    // No bloqueamos la creación de órdenes si no está configurado
 
     // Verificar que el niño existe y pertenece al usuario
     const child = await this.prisma.child.findUnique({
@@ -83,7 +69,7 @@ export class WithdrawalService {
 
     if (existingPicker) {
       throw new BadRequestException(
-        "Esta cédula ya tiene una orden de retiro activa. Completa o cancela la orden anterior primero."
+        "Esta cédula ya tiene una orden de retiro activa. Completa o cancela la orden anterior primero.",
       );
     }
 
@@ -200,7 +186,7 @@ export class WithdrawalService {
     // Verificar que el usuario es el padre de la orden
     if (order.parentId !== userId) {
       throw new BadRequestException(
-        "You are not authorized to view these credentials"
+        "You are not authorized to view these credentials",
       );
     }
 
@@ -220,7 +206,7 @@ export class WithdrawalService {
     // Verificar que hay un código encriptado almacenado
     if (!order.picker.encryptedCode) {
       throw new NotFoundException(
-        "No temporary code found for this picker. Please contact support."
+        "No temporary code found for this picker. Please contact support.",
       );
     }
 
@@ -365,7 +351,7 @@ export class WithdrawalService {
         order.child.name,
         pickerData.name,
         order.picker.relationship,
-        completionTime
+        completionTime,
       );
     }
 
@@ -460,7 +446,7 @@ export class WithdrawalService {
       // Verificar que la orden está en estado VALIDATED
       if (order.status !== WithdrawalStatus.VALIDATED) {
         throw new BadRequestException(
-          `La orden no puede ser procesada. Estado actual: ${order.status}`
+          `La orden no puede ser procesada. Estado actual: ${order.status}`,
         );
       }
 
@@ -579,7 +565,7 @@ export class WithdrawalService {
 
     if (order.status !== WithdrawalStatus.VALIDATED) {
       throw new BadRequestException(
-        `La orden debe estar VALIDADA primero. Estado actual: ${order.status}`
+        `La orden debe estar VALIDADA primero. Estado actual: ${order.status}`,
       );
     }
 
@@ -640,7 +626,7 @@ export class WithdrawalService {
           order.child.name,
           pickerData.name,
           pickerData.relationship,
-          completionTime
+          completionTime,
         )
       : false;
 

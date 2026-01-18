@@ -1,13 +1,21 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { UserRole } from '@prisma/client';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { UserRole } from "@prisma/client";
 
 @Injectable()
 export class RoleGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.get<UserRole[]>('roles', context.getHandler());
+    // Lee los roles requeridos del handler (método) y del controller (clase)
+    const requiredRoles =
+      this.reflector.get<UserRole[]>("roles", context.getHandler()) ||
+      this.reflector.get<UserRole[]>("roles", context.getClass());
     if (!requiredRoles) {
       return true;
     }
@@ -16,12 +24,12 @@ export class RoleGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('User not authenticated');
+      throw new ForbiddenException("User not authenticated");
     }
 
     if (!requiredRoles.includes(user.role)) {
       throw new ForbiddenException(
-        `This action requires one of the following roles: ${requiredRoles.join(', ')}`,
+        `This action requires one of the following roles: ${requiredRoles.join(", ")}`,
       );
     }
 

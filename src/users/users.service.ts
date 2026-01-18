@@ -126,7 +126,7 @@ export class UsersService {
       phone?: string;
       institutionId?: string;
     },
-    currentUser: { id: string; role: UserRole; institutionId?: string }
+    currentUser: { id: string; role: UserRole; institutionId?: string },
   ) {
     // Validar que el rol del creador permite crear el rol solicitado
     if (currentUser.role === UserRole.GESTOR) {
@@ -136,7 +136,12 @@ export class UsersService {
       // Asignar la institución del gestor al guardia
       data.institutionId = currentUser.institutionId;
     } else if (currentUser.role === UserRole.ADMIN) {
-      // Admin puede crear cualquier tipo de usuario
+      // Admin solo puede crear GESTORES (los guardias los crea el gestor)
+      if (data.role !== UserRole.GESTOR) {
+        throw new ForbiddenException(
+          "Los administradores solo pueden crear gestores. Los guardias deben ser creados por el gestor de cada institución.",
+        );
+      }
     } else {
       throw new ForbiddenException("No tiene permisos para crear usuarios");
     }
@@ -194,7 +199,7 @@ export class UsersService {
       phone?: string;
       institutionId?: string;
     },
-    currentUser: { id: string; role: UserRole; institutionId?: string }
+    currentUser: { id: string; role: UserRole; institutionId?: string },
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -204,16 +209,26 @@ export class UsersService {
       throw new NotFoundException("Usuario no encontrado");
     }
 
-    // Validar permisos
+    // Validar permisos según el rol del usuario actual
     if (currentUser.role === UserRole.GESTOR) {
-      // Gestor solo puede actualizar usuarios de su institución
-      if (user.institutionId !== currentUser.institutionId) {
+      // Gestor solo puede actualizar guardias de su institución
+      if (
+        user.role !== UserRole.GUARDIAN ||
+        user.institutionId !== currentUser.institutionId
+      ) {
         throw new ForbiddenException(
-          "No tiene permisos para modificar este usuario"
+          "Solo puede modificar guardias de su institución",
         );
       }
-      // No puede cambiar la institución
+      // Gestor no puede cambiar la institución del guardia
       delete data.institutionId;
+    } else if (currentUser.role === UserRole.ADMIN) {
+      // Admin solo puede actualizar gestores
+      if (user.role !== UserRole.GESTOR) {
+        throw new ForbiddenException("Solo puede modificar gestores");
+      }
+    } else {
+      throw new ForbiddenException("No tiene permisos para esta acción");
     }
 
     return this.prisma.user.update({
@@ -242,7 +257,7 @@ export class UsersService {
   async toggleUserStatus(
     id: string,
     isActive: boolean,
-    currentUser: { id: string; role: UserRole; institutionId?: string }
+    currentUser: { id: string; role: UserRole; institutionId?: string },
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -252,24 +267,36 @@ export class UsersService {
       throw new NotFoundException("Usuario no encontrado");
     }
 
-    // Validar permisos
+    // Validar permisos según el rol del usuario actual
     if (currentUser.role === UserRole.GESTOR) {
-      // Gestor solo puede desactivar guardias de su institución
+      // Gestor solo puede activar/desactivar guardias de su institución
       if (
         user.role !== UserRole.GUARDIAN ||
         user.institutionId !== currentUser.institutionId
       ) {
         throw new ForbiddenException(
-          "No tiene permisos para modificar este usuario"
+          "Solo puede modificar guardias de su institución",
         );
       }
     } else if (currentUser.role === UserRole.ADMIN) {
-      // Admin puede desactivar cualquier usuario excepto otros admins
-      if (user.role === UserRole.ADMIN && user.id !== currentUser.id) {
+      // Admin solo puede activar/desactivar gestores (no otros admins, no guardias directamente)
+      if (user.role === UserRole.ADMIN) {
         throw new ForbiddenException(
-          "No puede desactivar a otros administradores"
+          "No puede modificar a otros administradores",
         );
       }
+      if (user.role === UserRole.GUARDIAN) {
+        throw new ForbiddenException(
+          "Los guardias deben ser gestionados por el gestor de su institución",
+        );
+      }
+      if (user.role !== UserRole.GESTOR) {
+        throw new ForbiddenException(
+          "Solo puede modificar cuentas de gestores",
+        );
+      }
+    } else {
+      throw new ForbiddenException("No tiene permisos para esta acción");
     }
 
     return this.prisma.user.update({
@@ -285,7 +312,7 @@ export class UsersService {
     });
   }
 
-  // Asignar institución a usuario
+  // Asignar institución a gestor (solo admin puede usar esto)
   async assignInstitution(userId: string, institutionId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -295,12 +322,23 @@ export class UsersService {
       throw new NotFoundException("Usuario no encontrado");
     }
 
+    // Solo se puede asignar institución a gestores
+    if (user.role !== UserRole.GESTOR) {
+      throw new ForbiddenException(
+        "Solo se puede asignar institución a gestores",
+      );
+    }
+
     const institution = await this.prisma.institution.findUnique({
       where: { id: institutionId },
     });
 
     if (!institution) {
       throw new NotFoundException("Institución no encontrada");
+    }
+
+    if (!institution.isActive) {
+      throw new ForbiddenException("La institución está inactiva");
     }
 
     return this.prisma.user.update({
@@ -370,7 +408,7 @@ export class UsersService {
   async assignChildToParent(
     parentId: string,
     childData: { name: string; grade: string },
-    institutionId: string
+    gestorInstitutionId: string,
   ) {
     const parent = await this.prisma.user.findUnique({
       where: { id: parentId },
@@ -384,9 +422,14 @@ export class UsersService {
       throw new ForbiddenException("El usuario no es un padre");
     }
 
+    // Validar que el padre pertenezca a la misma institución que el gestor
+    if (parent.institutionId !== gestorInstitutionId) {
+      throw new ForbiddenException("El padre no pertenece a su institución");
+    }
+
     // Obtener la institución para el campo school
     const institution = await this.prisma.institution.findUnique({
-      where: { id: institutionId },
+      where: { id: parent.institutionId },
     });
 
     return this.prisma.child.create({
@@ -395,7 +438,7 @@ export class UsersService {
         grade: childData.grade,
         school: institution?.name || "Sin asignar",
         parentId,
-        institutionId,
+        institutionId: parent.institutionId,
       },
       include: {
         parent: {

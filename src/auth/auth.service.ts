@@ -12,7 +12,7 @@ import * as bcrypt from "bcryptjs";
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   async register(createUserDto: CreateUserDto) {
@@ -22,6 +22,21 @@ export class AuthService {
 
     if (existingUser) {
       throw new ConflictException("Email already registered");
+    }
+
+    // Validar institución si el rol es PARENT
+    if (createUserDto.role === "PARENT") {
+      if (!createUserDto.institutionId) {
+        throw new ConflictException("Debe seleccionar una institución");
+      }
+      const institution = await this.prisma.institution.findUnique({
+        where: { id: createUserDto.institutionId },
+      });
+      if (!institution || !institution.isActive) {
+        throw new ConflictException(
+          "La institución seleccionada no existe o está inactiva",
+        );
+      }
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
@@ -84,7 +99,7 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
-      user.password
+      user.password,
     );
 
     if (!isPasswordValid) {
@@ -163,7 +178,7 @@ export class AuthService {
     const hashedPassword = picker.temporaryPassword;
     if (!hashedPassword) {
       throw new UnauthorizedException(
-        "No hay credenciales temporales configuradas"
+        "No hay credenciales temporales configuradas",
       );
     }
 
