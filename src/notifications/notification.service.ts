@@ -2,13 +2,43 @@ import { Injectable, Logger } from "@nestjs/common";
 import TelegramBot from "node-telegram-bot-api";
 
 /**
- * Servicio de notificaciones usando Telegram Bot API (GRATUITO)
+ * @fileoverview Servicio de Notificaciones via Telegram Bot API
+ * @module notifications/notification.service
+ * @security NOTIFICATIONS - Comunicación segura con usuarios via Telegram
  *
- * CONFIGURACIÓN:
- * 1. Hablar con @BotFather en Telegram
- * 2. Crear nuevo bot: /newbot
- * 3. Copiar el token y agregarlo en .env como TELEGRAM_BOT_TOKEN
- * 4. Los padres deben iniciar chat con el bot y vincular su cuenta
+ * @description
+ * Servicio que gestiona todas las notificaciones del sistema usando
+ * la API de Telegram Bot (servicio gratuito).
+ *
+ * ## Funcionalidades:
+ * - Notificación de retiro completado a padres
+ * - Envío de credenciales temporales para pickers
+ * - Alertas de seguridad y eventos importantes
+ * - Vinculación de cuentas de usuario con Telegram
+ *
+ * ## Seguridad Implementada:
+ * - Token del bot almacenado en variable de entorno
+ * - Chat IDs vinculados a cuentas de usuario verificadas
+ * - Modo polling deshabilitado (solo envío de mensajes)
+ * - Fallback graceful si Telegram no está configurado
+ * - No se exponen credenciales en logs
+ *
+ * ## Configuración:
+ * 1. Crear bot con @BotFather en Telegram
+ * 2. Obtener token y configurar TELEGRAM_BOT_TOKEN en .env
+ * 3. Los usuarios vinculan su Telegram desde la app
+ *
+ * @example
+ * // Enviar notificación de retiro
+ * await notificationService.notifyWithdrawalCompleted(
+ *   parentChatId,
+ *   "María García",
+ *   "Juan Pérez",
+ *   "Abuelo",
+ *   new Date()
+ * );
+ *
+ * @see AuthService.linkTelegramAccount - Vinculación de cuentas
  */
 @Injectable()
 export class NotificationService {
@@ -16,6 +46,14 @@ export class NotificationService {
   private bot: TelegramBot | null = null;
   private readonly enabled: boolean;
 
+  /**
+   * Inicializa el servicio de notificaciones
+   *
+   * @security
+   * - Verifica token antes de inicializar bot
+   * - Falla gracefully si token no está configurado
+   * - No expone token en logs
+   */
   constructor() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -37,6 +75,11 @@ export class NotificationService {
     }
   }
 
+  /**
+   * Inicializa conexión con el bot y obtiene información
+   * @private
+   * @security Almacena username del bot para enlaces de vinculación
+   */
   private async initializeBot() {
     if (!this.bot) return;
 
@@ -50,14 +93,28 @@ export class NotificationService {
   }
 
   /**
-   * Obtener el username del bot
+   * Obtiene el username del bot de Telegram
+   * @returns {string} Username del bot (ej: "@safe_pick_uio_bot")
    */
   getBotUsername(): string {
     return process.env.TELEGRAM_BOT_USERNAME || "safe_pick_uio_bot";
   }
 
   /**
-   * Enviar notificación de retiro completado al padre
+   * Envía notificación de retiro completado al padre
+   *
+   * @param {string|null} telegramChatId - Chat ID del padre (null si no vinculado)
+   * @param {string} childName - Nombre del niño retirado
+   * @param {string} pickerName - Nombre de quien retiró
+   * @param {string} pickerRelationship - Relación con el niño
+   * @param {Date} completionTime - Fecha y hora del retiro
+   *
+   * @returns {Promise<boolean>} true si se envió, false si falló o no habilitado
+   *
+   * @security
+   * - No falla si Telegram no está configurado
+   * - Formato de mensaje sanitizado (Markdown)
+   * - Hora en zona horaria de Ecuador
    */
   async notifyWithdrawalCompleted(
     telegramChatId: string | null,

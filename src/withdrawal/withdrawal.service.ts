@@ -11,6 +11,38 @@ import * as bcrypt from "bcryptjs";
 import { WithdrawalStatus } from "@prisma/client";
 import { CryptoUtil } from "../common/utils/crypto.util";
 
+/**
+ * @fileoverview Servicio de Gestión de Órdenes de Retiro
+ * @module withdrawal/withdrawal.service
+ * @security WITHDRAWAL_MANAGEMENT - Gestión segura de retiros escolares
+ *
+ * @description
+ * Servicio central que gestiona todo el flujo de retiro de niños:
+ * - Creación de órdenes de retiro con validación de propiedad
+ * - Generación de credenciales temporales para pickers
+ * - Códigos QR únicos y tokens criptográficamente seguros
+ * - Validación y completado de retiros por guardias
+ * - Registro de auditoría de todas las operaciones
+ *
+ * ## Seguridad Implementada:
+ * - Validación de propiedad: padres solo acceden a sus hijos
+ * - Códigos temporales hasheados con bcrypt (factor 10)
+ * - Códigos cifrados con AES-256-CBC para recuperación
+ * - Expiración automática a las 2PM del día
+ * - Prevención de órdenes duplicadas por cédula
+ * - Filtrado por institución para guardias
+ * - Logs de auditoría para cada retiro completado
+ *
+ * ## Flujo de Retiro:
+ * 1. Padre crea orden → se generan credenciales para picker
+ * 2. Padre comparte credenciales con picker
+ * 3. Picker inicia sesión con cédula + código OTP
+ * 4. Guardia escanea QR → valida datos → completa retiro
+ * 5. Sistema envía notificación al padre (Telegram opcional)
+ *
+ * @see CryptoUtil - Utilidades criptográficas para códigos
+ * @see NotificationService - Envío de notificaciones
+ */
 @Injectable()
 export class WithdrawalService {
   constructor(
@@ -18,12 +50,24 @@ export class WithdrawalService {
     private notificationService: NotificationService,
   ) {}
 
-  // Generar código temporal de 6 dígitos
+  /**
+   * Genera código temporal OTP de 6 dígitos
+   * @returns {string} Código numérico de 6 dígitos
+   * @security Usar CryptoUtil.generateSecureOtp() en producción para mayor seguridad
+   */
   private generateTemporaryCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  // Calcular fecha de expiración (2 PM del mismo día o siguiente día)
+  /**
+   * Calcula fecha de expiración del código temporal
+   *
+   * El código expira a las 2PM (14:00) del día de creación,
+   * o del día siguiente si se crea después de las 2PM.
+   *
+   * @returns {Date} Fecha y hora de expiración
+   * @security Expiración corta para limitar ventana de ataque
+   */
   private calculateExpirationDate(): Date {
     const now = new Date();
     const expirationDate = new Date();
@@ -40,7 +84,37 @@ export class WithdrawalService {
     return expirationDate;
   }
 
-  // Paso 1: Crear orden de retiro con datos del picker y credenciales temporales
+  /**
+   * Crea una nueva orden de retiro con credenciales temporales para el picker
+   *
+   * Flujo completo:
+   * 1. Valida que el niño pertenece al padre que crea la orden
+   * 2. Verifica que la cédula del picker no tenga orden activa
+   * 3. Genera código OTP temporal y lo hashea con bcrypt
+   * 4. Cifra el código para posible recuperación segura
+   * 5. Genera código QR único para la orden
+   * 6. Envía notificación al padre con las credenciales
+   *
+   * @param {string} userId - ID del padre que crea la orden
+   * @param {CreateWithdrawalOrderDto} createWithdrawalOrderDto - Datos de la orden
+   * @param {string} createWithdrawalOrderDto.childId - ID del niño a retirar
+   * @param {string} createWithdrawalOrderDto.pickerCedula - Cédula del encargado
+   * @param {string} createWithdrawalOrderDto.pickerName - Nombre del encargado
+   * @param {string} createWithdrawalOrderDto.pickerPhone - Teléfono del encargado
+   * @param {string} createWithdrawalOrderDto.relationship - Relación con el niño
+   *
+   * @returns {Promise<object>} Orden creada con credenciales temporales
+   * @throws {NotFoundException} Si el niño no existe
+   * @throws {BadRequestException} Si el niño no pertenece al padre
+   * @throws {BadRequestException} Si la cédula ya tiene orden activa
+   *
+   * @security
+   * - Validación de propiedad del niño (parentId === userId)
+   * - Prevención de órdenes duplicadas por cédula
+   * - Código hasheado con bcrypt factor 10
+   * - Código cifrado con AES-256-CBC
+   * - Expiración automática a las 2PM
+   */
   async createWithdrawalOrder(
     userId: string,
     createWithdrawalOrderDto: CreateWithdrawalOrderDto,
@@ -275,7 +349,28 @@ export class WithdrawalService {
     });
   }
 
-  // Completar retiro (para administrador o picker)
+  /**
+   * Completa una orden de retiro validada
+   *
+   * Ejecuta transacción atómica que:
+   * 1. Crea registro en tabla de auditoría (WithdrawalLog)
+   * 2. Actualiza estado de la orden a COMPLETED
+   * 3. Elimina datos temporales del picker
+   *
+   * @param {string} orderId - ID de la orden a completar
+   * @param {string} role - Rol del usuario que completa (GUARDIAN/ADMIN)
+   *
+   * @returns {Promise<object>} Orden completada con timestamp
+   * @throws {NotFoundException} Si la orden no existe
+   * @throws {BadRequestException} Si la orden no está en estado VALIDATED
+   * @throws {BadRequestException} Si no hay picker asociado
+   *
+   * @security
+   * - Solo órdenes en estado VALIDATED pueden completarse
+   * - Transacción atómica para integridad de datos
+   * - Log de auditoría con datos del picker antes de eliminar
+   * - Eliminación de credenciales temporales tras completar
+   */
   async completeWithdrawal(orderId: string, role: string) {
     const order = (await this.prisma.withdrawalOrder.findUnique({
       where: { id: orderId },
@@ -406,7 +501,30 @@ export class WithdrawalService {
     };
   }
 
-  // Validar QR escaneado (para guardias/admin)
+  /**
+   * Valida un código QR escaneado por el guardia
+   *
+   * Proceso de validación:
+   * 1. Decodifica el token Base64 a JSON
+   * 2. Busca la orden en la base de datos
+   * 3. Verifica que el QR coincide con el almacenado
+   * 4. Valida datos del picker contra la orden
+   * 5. Confirma estado VALIDATED de la orden
+   *
+   * @param {string} qrToken - Token del QR en formato Base64
+   *
+   * @returns {Promise<object>} Datos de validación con información de la orden
+   * @throws {NotFoundException} Si la orden no existe
+   * @throws {BadRequestException} Si el QR está manipulado
+   * @throws {BadRequestException} Si los datos del picker no coinciden
+   * @throws {BadRequestException} Si la orden no está en estado VALIDATED
+   *
+   * @security
+   * - Decodificación segura con try/catch
+   * - Comparación de QR almacenado vs escaneado
+   * - Verificación de integridad de datos del picker
+   * - Mensajes de error genéricos para datos inválidos
+   */
   async validateQrCode(qrToken: string) {
     try {
       // Decodificar el token
@@ -486,7 +604,21 @@ export class WithdrawalService {
     }
   }
 
-  // Obtener orden del picker temporal
+  /**
+   * Obtiene la orden asignada a un picker temporal
+   *
+   * @param {string} pickerId - ID del picker (extraído del token JWT)
+   *
+   * @returns {Promise<object>} Datos del picker y su orden asignada
+   * @throws {NotFoundException} Si el picker no existe
+   * @throws {BadRequestException} Si el código ha expirado
+   * @throws {BadRequestException} Si la cuenta está desactivada
+   *
+   * @security
+   * - Verificación de expiración del código
+   * - Verificación de estado activo del picker
+   * - Solo retorna datos necesarios para mostrar en UI
+   */
   async getPickerOrder(pickerId: string) {
     const picker = (await this.prisma.picker.findUnique({
       where: { id: pickerId },
@@ -541,7 +673,33 @@ export class WithdrawalService {
     };
   }
 
-  // Escanear QR y completar retiro (Para GUARDIA)
+  /**
+   * Escanea código QR y completa el retiro en una sola operación
+   *
+   * Flujo completo para guardias:
+   * 1. Valida el código QR escaneado
+   * 2. Verifica estado VALIDATED de la orden
+   * 3. Crea registro de auditoría (WithdrawalLog)
+   * 4. Actualiza estado a COMPLETED con timestamp
+   * 5. Elimina credenciales temporales del picker
+   * 6. Envía notificación al padre (Telegram si está configurado)
+   *
+   * @param {string} qrToken - Token del QR escaneado (Base64)
+   * @param {string} guardianId - ID del guardia que procesa el retiro
+   *
+   * @returns {Promise<object>} Resultado del retiro con datos de auditoría
+   * @throws {BadRequestException} Si el QR es inválido
+   * @throws {NotFoundException} Si la orden no existe
+   * @throws {BadRequestException} Si la orden no está en estado VALIDATED
+   * @throws {BadRequestException} Si no hay picker asociado
+   *
+   * @security
+   * - Validación previa del QR antes de completar
+   * - Transacción atómica para integridad de datos
+   * - Registro de auditoría con datos del guardia
+   * - Eliminación de credenciales temporales tras completar
+   * - Notificación al padre para trazabilidad
+   */
   async scanQrAndComplete(qrToken: string, guardianId: string) {
     // 1. Validar el QR
     const validationResult = await this.validateQrCode(qrToken);
