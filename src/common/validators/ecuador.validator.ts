@@ -6,8 +6,41 @@ import {
 } from "class-validator";
 
 /**
- * Validador de cédula ecuatoriana
- * La cédula ecuatoriana tiene 10 dígitos y un algoritmo de verificación
+ * @fileoverview Validadores Personalizados para Datos Ecuatorianos
+ * @module common/validators/ecuador.validator
+ * @security INPUT_VALIDATION - Validación específica de documentos ecuatorianos
+ *
+ * @description
+ * Validadores personalizados de class-validator para datos específicos de Ecuador.
+ * Implementan algoritmos oficiales de validación de documentos de identidad.
+ *
+ * ## Validadores Incluidos:
+ * - IsCedulaEcuatoriana: Valida cédula con algoritmo módulo 10
+ * - IsTelefonoEcuatoriano: Valida formatos telefónicos nacionales
+ *
+ * ## Seguridad Implementada:
+ * - Validación de formato antes de procesamiento
+ * - Algoritmo oficial del Registro Civil de Ecuador
+ * - Prevención de inyección de caracteres especiales
+ * - Solo permite dígitos numéricos
+ *
+ * @see CreateUserDto - Usa estos validadores para registro
+ */
+
+/**
+ * Validador de cédula ecuatoriana con algoritmo módulo 10
+ *
+ * La cédula ecuatoriana consta de 10 dígitos:
+ * - Dígitos 1-2: Código de provincia (01-24)
+ * - Dígito 3: Tipo de documento (0-5 = persona natural)
+ * - Dígitos 4-9: Número secuencial
+ * - Dígito 10: Dígito verificador (algoritmo módulo 10)
+ *
+ * @security
+ * - Valida formato estricto (solo 10 dígitos)
+ * - Verifica código de provincia válido
+ * - Aplica algoritmo del Registro Civil
+ * - Opcional: retorna true si no se proporciona valor
  */
 @ValidatorConstraint({ async: false })
 export class IsCedulaEcuatorianaConstraint implements ValidatorConstraintInterface {
@@ -55,6 +88,18 @@ export class IsCedulaEcuatorianaConstraint implements ValidatorConstraintInterfa
   }
 }
 
+/**
+ * Decorador para aplicar validación de cédula ecuatoriana
+ *
+ * @param {ValidationOptions} [validationOptions] - Opciones de validación
+ * @returns {PropertyDecorator} Decorador para aplicar al campo
+ *
+ * @example
+ * class UserDto {
+ *   @IsCedulaEcuatoriana({ message: 'Cédula inválida' })
+ *   cedula: string;
+ * }
+ */
 export function IsCedulaEcuatoriana(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({
@@ -69,10 +114,16 @@ export function IsCedulaEcuatoriana(validationOptions?: ValidationOptions) {
 
 /**
  * Validador de teléfono ecuatoriano
+ *
  * Formatos aceptados:
- * - +593XXXXXXXXX (código país + 9 dígitos)
- * - 09XXXXXXXX (celular nacional)
- * - 0XXXXXXXXX (fijo nacional)
+ * - +593XXXXXXXXX: Formato internacional (código país + 9 dígitos)
+ * - 09XXXXXXXX: Celular nacional (10 dígitos, empieza con 09)
+ * - 0XXXXXXXX: Fijo nacional (9 dígitos, código de área 2-7)
+ *
+ * @security
+ * - Valida formato estricto de teléfono
+ * - Previene inyección de caracteres especiales
+ * - Solo permite dígitos y símbolo +
  */
 @ValidatorConstraint({ async: false })
 export class IsTelefonoEcuatorianoConstraint implements ValidatorConstraintInterface {
